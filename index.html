@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="unity-webgl" content="true">
+	
+    <title>Unity WebGL Player | TestWebGl</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+	<style>
+		{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Убираем скролл */
+            background: #fff; /* Фон на случай черных полей */
+        }
+		
+        #unity-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center; /* Горизонтальное центрирование */
+            align-items: center;     /* Вертикальное центрирование */
+            background: #000;
+        }
+        
+        #unity-canvas {
+            background: #000;
+            /* Размеры будут установлены JavaScript */
+        }
+        
+        /* Черные полосы (letterbox/pillarbox) */
+        .letterbox {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 50%; /* Займет все пустое пространство */
+            background: #000;
+            z-index: -1;
+        }
+        
+        .pillarbox {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 50%;
+            background: #000;
+            z-index: -1;
+        }
+		
+
+	</style>
+  </head>
+  <body>   
+      <div id="unity-container" style="position: absolute; width: 100%; height: 100%; left: 0%; top: 0%;">
+        <canvas id="unity-canvas" style="position: absolute; width: 100%; height: 100%"></canvas>
+        <!-- Черные полосы будут добавлены динамически -->
+    </div>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>   
+    <script>
+
+      var container = document.querySelector("#unity-container");
+      var canvas = document.querySelector("#unity-canvas");
+      var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var fullscreenButton = document.querySelector("#unity-fullscreen-button");
+      var warningBanner = document.querySelector("#unity-warning");
+
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/Build.loader.js";
+      var config = {
+        dataUrl: buildUrl + "/Build.data.unityweb",
+        frameworkUrl: buildUrl + "/Build.framework.js.unityweb",
+        codeUrl: buildUrl + "/Build.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "TestWebGl",
+        productVersion: "1.0",
+        showBanner: unityShowBanner,
+      };
+
+      // By default, Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
+
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        container.className = "unity-mobile";
+        canvas.className = "unity-mobile";
+
+        // To lower canvas resolution on mobile devices to gain some
+        // performance, uncomment the following line:
+        // config.devicePixelRatio = 1;
+
+
+      } else {
+        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+      }
+
+      loadingBar.style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          progressBarFull.style.width = 100 * progress + "%";
+              }).then((unityInstance) => {
+                loadingBar.style.display = "none";
+                
+              }).catch((message) => {
+                alert(message);
+              });
+            };
+
+      document.body.appendChild(script);
+
+function calculateGameSize(gameWidth, gameHeight, maxWidth) {
+    const targetAspect = gameWidth / gameHeight;
+    const viewportAspect = window.innerWidth / window.innerHeight;
+    
+    let width, height;
+    
+    if (viewportAspect > targetAspect) {
+        // Широкий экран - ограничиваем по высоте
+        height = Math.min(window.innerHeight, maxWidth / targetAspect);
+        width = height * targetAspect;
+    } else {
+        // Высокий экран - ограничиваем по ширине
+        width = Math.min(window.innerWidth, maxWidth);
+        height = width / targetAspect;
+    }
+    
+    return { width, height };
+}
+
+class UnityAspectRatioManager {
+    constructor(targetWidth, targetHeight, maxWidth = 1920) {
+        this.targetWidth = targetWidth;
+        this.targetHeight = targetHeight;
+        this.targetAspect = targetWidth / targetHeight;
+        this.maxWidth = maxWidth;
+        
+        this.canvas = document.getElementById('unity-canvas');
+        this.container = document.getElementById('unity-container');
+        
+        this.init();
+    }
+    
+    init() {
+        this.setupEventListeners();
+        this.updateSize();
+        this.setupResizeObserver();
+    }
+    
+    setupEventListeners() {
+        window.addEventListener('resize', () => this.debouncedResize());
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => this.updateSize(), 100);
+        });
+        
+        // Обработчик полного экрана
+        document.addEventListener('fullscreenchange', () => this.updateSize());
+    }
+    
+    debouncedResize() {
+        clearTimeout(this.resizeTimeout);
+        this.resizeTimeout = setTimeout(() => this.updateSize(), 100);
+    }
+    
+    updateSize() {
+        const containerWidth = this.container.clientWidth;
+        const containerHeight = this.container.clientHeight;
+        const containerAspect = containerWidth / containerHeight;
+        
+        let gameWidth, gameHeight;
+        
+        if (containerAspect > this.targetAspect) {
+            // Контейнер шире игры - ограничение по высоте
+            gameHeight = Math.min(containerHeight, this.maxWidth / this.targetAspect);
+            gameWidth = gameHeight * this.targetAspect;
+        } else {
+            // Контейнер уже игры - ограничение по ширине
+            gameWidth = Math.min(containerWidth, this.maxWidth);
+            gameHeight = gameWidth / this.targetAspect;
+        }
+        
+        // Устанавливаем размеры canvas
+        this.canvas.style.width = gameWidth + 'px';
+        this.canvas.style.height = gameHeight + 'px';
+        
+        // Обновляем атрибуты width/height для рендеринга
+        this.canvas.width = gameWidth;
+        this.canvas.height = gameHeight;
+        
+        // Уведомляем Unity о изменении размера
+        this.notifyUnity(gameWidth, gameHeight);
+        
+        console.log(`Game size: ${gameWidth}x${gameHeight}, Scale: ${gameWidth/this.targetWidth}`);
+    }
+    
+    notifyUnity(width, height) {
+        if (window.unityInstance) {
+            // Отправляем точные пиксельные размеры
+            window.unityInstance.SendMessage('GameManager', 'OnWebGLResize', 
+                `${width},${height},${width/this.targetWidth}`);
+        }
+    }
+    
+    setupResizeObserver() {
+        // Следим за изменениями размера контейнера
+        if ('ResizeObserver' in window) {
+            const observer = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    this.updateSize();
+                }
+            });
+            observer.observe(this.container);
+        }
+    }
+    
+    // Метод для ручного обновления (например, после загрузки ассетов)
+    forceUpdate() {
+        this.updateSize();
+    }
+}
+
+// Инициализация после загрузки страницы
+document.addEventListener('DOMContentLoaded', () => {
+    // Укажите исходное соотношение сторон вашей игры
+    const aspectManager = new UnityAspectRatioManager(1080, 2400, 1080);
+});
+    </script>
+  </body>
+</html>
